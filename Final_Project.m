@@ -38,7 +38,7 @@ for i = 1: num_images
 end
 
 % Center the data
-mean_face = mean(img_matrix, 2);
+mean_face = mean(img_matrix, 1);
 faces_centered = img_matrix - mean_face;
 
 % Compute covariance matrix
