@@ -3,70 +3,82 @@ close all % close figures and other stuff
 clear % clean the worksapce
 clc % clear command line
 
-% Optional: Use precomputed data
-use_saved = true; % Change to false to force reprocess
+%% Step 1: Load Dataset for training, validation, and testing
+train_pattern = fullfile('Images/train/','*.png');
+train_img_files = dir(train_pattern);
 
-if use_saved && isfile('preprocessed_data.mat')
-    fprintf('Loading preprocessed data...\n');
-    load('preprocessed_data.mat');
-else
-    %% Step 1: Load Dataset for training, validation, and testing
-    train_pattern = fullfile('Images/train/','*.png');
-    train_img_files = dir(train_pattern);
+train_num_images = numel(train_img_files);
+train_imgs = cell(1, train_num_images);
 
-    train_num_images = numel(train_img_files);
-    train_imgs = cell(1, train_num_images);
-
-    for i = 1:train_num_images
-        img_name = train_img_files(i).name;
-        fullPath = fullfile('Images/train', img_name);
-        raw_img = imread(fullPath);
-        train_imgs{i} = im2double(raw_img);
-    end
-
-    %% Step 2: Preprocess
-    n1 = 100; n2 = 100;
-    for i = 1:train_num_images
-        train_imgs{i} = PreprocessImage(train_imgs{i}, false);
-    end
-
-    %% Step 3: Feature Extraction
-    img_matrix = zeros(train_num_images, n1 * n2);
-    for i = 1:train_num_images
-        img_matrix(i, :) = train_imgs{i}(:);
-    end
-
-    mean_face = mean(img_matrix, 1);
-    faces_centered = img_matrix - mean_face;
-
-    covariance_matrix = faces_centered' * faces_centered / (train_num_images - 1);
-    [eigen_vectors, eigen_values] = eig(covariance_matrix, 'vector');
-    [eigen_values, sort_index] = sort(eigen_values, 'descend');
-    eigen_vectors = eigen_vectors(:, sort_index);
-
-    eigen_faces = faces_centered * eigen_vectors;
-    eigen_faces = eigen_faces ./ vecnorm(eigen_faces);
-
-    K = 50;
-    evecs_reduced = eigen_vectors(:, 1:K);
-    projected_data = faces_centered * evecs_reduced;
-
-    actor_names = cell(train_num_images,1);
-    for i = 1:train_num_images
-        name = train_img_files(i).name;
-        tokens = regexp(name, '([a-z_]+)(\d+)\.png$', 'tokens');
-        actor_names{i} = tokens{1}{1};
-    end
-    [unique_names, ~, labels] = unique(actor_names);
-
-    % Save everything
-    X_train = projected_data;
-    y_train = labels;
-    save('preprocessed_data.mat', 'X_train', 'y_train', ...
-         'mean_face', 'evecs_reduced', 'unique_names', 'n1', 'n2');
+% Load into an array of images
+for i = 1: train_num_images
+    img_name = train_img_files(i).name;
+    fullPath = fullfile('Images/train', img_name);
+    raw_img = imread(fullPath);
+    train_imgs{i} = im2double(raw_img);
 end
 
+%% Step 2: Process Images
+
+% Image size
+n1 = 100;
+n2 = 100;
+
+for i = 1: train_num_images
+    train_imgs{i} = PreprocessImage(train_imgs{i}, false);
+end
+
+%% Step 3: Feature Extraction
+
+% Allocate space for data matrix
+img_matrix = zeros(train_num_images, 10000);
+
+for i = 1: train_num_images
+    img_matrix(i, :) = train_imgs{i}(:);
+end
+
+% Center the data
+mean_face = mean(img_matrix, 1);
+faces_centered = img_matrix - mean_face;
+
+% Compute covariance matrix
+covariance_matrix = faces_centered' * faces_centered / (train_num_images - 1);
+
+% Calculate eigenvectors and eigenvalues
+[eigen_vectors, eigen_values] = eig(covariance_matrix, 'vector');
+
+% Sort eigenvalues
+[eigen_values, sort_index] = sort(eigen_values, 'descend'); % Done in descending order
+eigen_vectors = eigen_vectors(:, sort_index);
+
+% Normalize
+eigen_faces = faces_centered * eigen_vectors;
+eigen_faces = eigen_faces ./ vecnorm(eigen_faces);
+
+% Display Mean Face
+figure(4);
+imagesc(reshape(mean_face, n1, n2));
+colormap gray; axis off; title('Mean Face');
+
+% Choose components to be used
+K = 50;
+evecs_reduced = eigen_vectors(:, 1:K);           % 10000×50
+projected_data = faces_centered * evecs_reduced; % num_images×50
+
+actor_names = cell(train_num_images,1);
+for i = 1:train_num_images
+    name = train_img_files(i).name;
+    tokens = regexp(name, '([a-z_]+)(\d+)\.png$', 'tokens');
+    actor_names{i} = tokens{1}{1}; % e.g., 'scarlett_johansson'
+end
+
+% Get unique class labels and map them to numeric values
+[unique_names, ~, labels] = unique(actor_names); % labels will now be 1..N
+
 %% Step 5: Train Classifiers
+
+X_train = projected_data;
+y_train = labels;
 
 % KNN Model
 knn_model = fitcknn(X_train, y_train, 'NumNeighbors', 3);
@@ -102,6 +114,9 @@ title(sprintf('Predicted by KNN: %s | NB: %s', knn_name, nb_name), ...
     'Interpreter', 'none');
 
 %% Functions
+
+% This is for a brand new dataset
+funciton 
 
 % Preprocess Image Input
 function img = PreprocessImage(input, need_crop)
