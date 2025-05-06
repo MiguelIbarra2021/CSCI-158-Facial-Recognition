@@ -5,6 +5,7 @@ clc % clear command line
 
 use_saved = true; % If false reprocess data
 
+% Either load from file or load in dataset
 if use_saved && isfile('preprocessed_data.mat')
     fprintf('Loading preprocessed data...\n');
     load('preprocessed_data.mat');
@@ -72,10 +73,10 @@ knn_model_pca = fitcknn(projected_data_pca, labels, 'NumNeighbors', 3);
 % Naive Bayes Model PCA
 nb_model_pca = fitcnb(projected_data_pca, labels, 'DistributionNames', 'kernel');
 
-% KNN Model LD
+% KNN Model LDA
 knn_model_lda = fitcknn(projected_data_lda, labels, 'NumNeighbors',3);
 
-% Naive Bayes Model LD
+% Naive Bayes Model LDA
 nb_model_lda  = fitcnb(projected_data_lda, labels, 'DistributionNames','kernel');
 
 %% Step 6: Load & Preprocess Test Set
@@ -154,8 +155,8 @@ figure;
 confusionchart(y_test, y_pred_nb_lda,  'RowSummary','row-normalized','ColumnSummary','column-normalized');
 title('NB + Fisherfaces Confusion Matrix');
 
-%% Step 10: ROC Curve & FPR/TPR (One-vs-All Example)
-class_idx = 3; % Pick an actor 1-5
+%% Step 10: ROC Curve & FPR/TPR
+class_idx = 5; % Pick an actor 1-5
 pos_label  = (y_test == class_idx);
 
 fprintf("Creating ROC Curve for %s...\n", unique_names{class_idx});
